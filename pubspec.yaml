@@ -1,0 +1,42 @@
+name: vani_edge
+description: A local-first, voice-enabled AI assistant.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State Management
+  flutter_riverpod: ^2.4.9
+
+  # Architecture: Local LLM (The Brain)
+  # Using llama_cpp_dart as it wraps llama.cpp effectively for Dart
+  llama_cpp_dart: 0.0.6 # Or latest compatible version
+  
+  # Speech Services (The Senses)
+  speech_to_text: ^7.3.0
+  flutter_tts: ^4.2.5
+  
+  # Persistence (History)
+  shared_preferences: ^2.2.2
+  
+  # Utils
+  path_provider: ^2.1.2
+  intl: ^0.19.0 # For locale handling
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+  
+  # Register the model folder
+  assets:
+    - assets/models/
+    - assets/bin/
