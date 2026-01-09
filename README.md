@@ -1,32 +1,54 @@
-# vani_edge
+# Vani Edge
 
-Local-first, voice-enabled AI assistant built with Flutter and llama.cpp.
+Speech-enabled, multi-lingual, local-first assistant built with Flutter (Option B: small on-device model + prompt wrapper). The same Dart logic runs across Android, Web, and Linux to keep response quality consistent.
 
-## Setup
+## Features
+- Speech-to-text and text-to-speech with live mic input (best effort by platform)
+- 5-language UX: English, Hindi, Marathi, Tamil, Gujarati
+- Local intent model (naive Bayes) + prompt wrapper (constraints, retry, cache)
+- Local knowledge base for consistent answers
+- Conversation history persisted locally
 
-1) Download the model (kept out of git):
-```
-scripts/download_model.sh
-```
-
-2) Build the desktop llama-cli binary (Linux/macOS/Windows):
-```
-scripts/build_llama_cli.sh /path/to/llama.cpp
-```
-
-3) Build Android native libs:
-```
-scripts/build_android_llama.sh /path/to/llama.cpp arm64-v8a 24
+## Quick Start
+```bash
+flutter pub get
+flutter run
 ```
 
-## Run
+### Build Outputs
+```bash
+flutter build apk
+flutter build web
+```
 
-Desktop:
-```
-flutter run -d linux
-```
+## Architecture & Docs
+See the `/docs` folder:
+- `docs/architecture.md`
+- `docs/prompt_wrapper.md`
+- `docs/performance.md`
+- `docs/limitations.md`
+- `docs/timesheet.md`
+- `docs/execution_plan.md`
 
-Android (local LLM enabled):
-```
-flutter run -d <device> --release --dart-define=ENABLE_LOCAL_LLM=true
-```
+## Local Model (Option B)
+- Intent detection: lightweight naive Bayes model trained from `assets/intent_samples.json`
+- Response generation: structured templates + local knowledge base `assets/knowledge_base.json`
+- Prompt wrapper: enforces language + format, retries once on low-quality output, and caches responses
+
+## Speech Notes
+- Android uses platform speech services; microphone permission required
+- Web uses browser SpeechRecognition/SpeechSynthesis (Chrome recommended)
+- Linux support is best-effort; STT/TTS may be unavailable and will fall back to text-only
+
+## Demo Checklist
+- Language switching
+- Mic STT
+- Response + TTS
+- Offline/local inference path
+- Repo structure + key modules
+
+## Timesheet
+Add your Google Sheet link in `docs/timesheet.md`.
+
+## Transcript / Recording
+Add transcript or recording link in `docs/limitations.md`.

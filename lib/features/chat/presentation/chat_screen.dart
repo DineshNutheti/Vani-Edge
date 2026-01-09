@@ -1,285 +1,310 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/services/llm_service.dart';
+
+import '../../../core/app_language.dart';
 import '../domain/message.dart';
-import '../domain/prompt_wrapper.dart';
-import '../../../core/services/tts_service.dart';
-import '../../../core/services/stt_service.dart';
+import 'chat_controller.dart';
 
-// State provider for the list of messages
-final chatHistoryProvider = StateProvider<List<Message>>((ref) => []);
+class ChatScreen extends StatefulWidget {
+  const ChatScreen({
+    super.key,
+    required this.controller,
+  });
 
-// State provider for the selected language
-final languageProvider = StateProvider<String>((ref) => 'English');
-
-class ChatScreen extends ConsumerStatefulWidget {
-  const ChatScreen({super.key});
+  final ChatController controller;
 
   @override
-  ConsumerState<ChatScreen> createState() => _ChatScreenState();
+  State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends ConsumerState<ChatScreen> {
+class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  
-  // The Brain's Logic Layer
-  final PromptWrapper _promptWrapper = PromptWrapper();
-  
-  bool _isThinking = false;
-  bool _isListening = false;
+  bool _initializing = true;
+  bool _isInternalUpdate = false;
 
-  // The 5 Required Languages
-  final List<String> _languages = ['English', 'Hindi', 'Marathi', 'Tamil', 'Gujarati'];
+  ChatController get controller => widget.controller;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      // 1. Wake up the Brain
-      ref.read(llmServiceProvider).initialize();
-      
-      // 2. Wake up the Ears (STT)
-      bool available = await ref.read(sttServiceProvider).initialize();
-      if (!available) {
-        print("Warning: Speech recognition not available on this platform.");
+    controller.addListener(_onControllerChanged);
+    controller.init().whenComplete(() {
+      if (mounted) {
+        setState(() {
+          _initializing = false;
+        });
       }
     });
   }
 
-  void _scrollToBottom() {
-    if (_scrollController.hasClients) {
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
-    }
+  @override
+  void dispose() {
+    controller.removeListener(_onControllerChanged);
+    _textController.dispose();
+    _scrollController.dispose();
+    super.dispose();
   }
 
-  // CORE LOGIC: Send text to the LLM Service
-  Future<void> _handleSubmitted(String text) async {
-    if (text.trim().isEmpty) return;
-
-    _textController.clear();
-    final currentLang = ref.read(languageProvider);
-
-    // 1. Add User Message to UI
-    ref.read(chatHistoryProvider.notifier).update((state) => [
-      ...state,
-      Message(text: text, isUser: true),
-    ]);
-    
-    setState(() => _isThinking = true);
-    _scrollToBottom();
-
-    String fullResponse = "";
-
-    // 2. Prepare AI Response container (Placeholder)
-    ref.read(chatHistoryProvider.notifier).update((state) => [
-      ...state,
-      Message(text: "...", isUser: false),
-    ]);
-
-    try {
-      // --- INTELLIGENT WRAPPER LOGIC START ---
-      
-      // Step A: Check Cache (Zero Latency)
-      final cachedResponse = _promptWrapper.getCachedResponse(text, currentLang);
-      
-      if (cachedResponse != null) {
-        print("Wrapper: Cache Hit! Returning instant response.");
-        fullResponse = cachedResponse;
-        
-        // Update UI immediately
-        ref.read(chatHistoryProvider.notifier).update((state) {
-          final List<Message> newState = List.from(state);
-          newState.last = Message(text: "$fullResponse [Cached]", isUser: false);
-          return newState;
-        });
-        
-        await Future.delayed(const Duration(milliseconds: 100));
-        
-      } else {
-        // Step B: Process Prompt
-        print("Wrapper: Cache Miss. Processing Intent...");
-        final formattedPrompt = _promptWrapper.processPrompt(text, currentLang);
-        
-        // Step C: Stream from Brain
-        final stream = ref.read(llmServiceProvider).streamResponse(formattedPrompt);
-        
-        await for (final token in stream) {
-          // DEBUG: Verify we are receiving data
-          print("UI RECEIVED TOKEN: $token");
-          
-          fullResponse += token;
-          
-          // Live update UI
-          ref.read(chatHistoryProvider.notifier).update((state) {
-            if (state.isEmpty) return state;
-            
-            // Force a state change by creating a new list
-            final List<Message> newState = List.from(state);
-            newState.last = Message(text: fullResponse, isUser: false);
-            return newState;
-          });
-        }
-        
-        // Step D: Save to Cache
-        _promptWrapper.cacheResponse(text, currentLang, fullResponse);
-      }
-      // --- INTELLIGENT WRAPPER LOGIC END ---
-
-      // 3. Speak the Response (TTS)
-      try {
-        ref.read(ttsServiceProvider).speak(fullResponse, currentLang);
-      } catch (e) {
-        print("TTS Error: $e");
-      }
-
-    } catch (e) {
-      print("Chat Error: $e");
-      ref.read(chatHistoryProvider.notifier).update((state) => [
-        ...state,
-        Message(text: "Error: $e", isUser: false),
-      ]);
-    } finally {
-      setState(() => _isThinking = false);
-      _scrollToBottom();
+  void _onControllerChanged() {
+    if (_isInternalUpdate) {
+      return;
     }
+    if (_textController.text != controller.draftText) {
+      _isInternalUpdate = true;
+      _textController.text = controller.draftText;
+      _textController.selection = TextSelection.collapsed(
+        offset: _textController.text.length,
+      );
+      _isInternalUpdate = false;
+    }
+    // Keep latest messages visible after new responses.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+    setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
-    final messages = ref.watch(chatHistoryProvider);
-    final selectedLang = ref.watch(languageProvider);
-
+    final strings = AppStrings(controller.language);
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Vani-Edge"),
+        title: Text(strings.appTitle),
         actions: [
-          // Language Selector with high-contrast styling
-          Theme(
-            data: Theme.of(context).copyWith(
-              canvasColor: Colors.white,
-              splashColor: Colors.deepPurple[50],
-              highlightColor: Colors.deepPurple[50],
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: selectedLang,
-                icon: const Icon(Icons.language, color: Colors.white),
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
-                onChanged: (String? newValue) {
-                  if (newValue != null) {
-                    ref.read(languageProvider.notifier).state = newValue;
-                  }
-                },
-                items: _languages.map<DropdownMenuItem<String>>((String value) {
-                  return DropdownMenuItem<String>(
-                    value: value,
-                    child: Text(
-                      value,
-                      style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w700),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
+          _LanguageMenu(
+            language: controller.language,
+            onChanged: (language) => controller.setLanguage(language),
           ),
-          const SizedBox(width: 16),
+          IconButton(
+            onPressed: controller.messages.isEmpty ? null : controller.clearHistory,
+            tooltip: strings.clearHistory,
+            icon: const Icon(Icons.delete_outline),
+          ),
         ],
       ),
-      body: Column(
-        children: [
-          // Chat Area
-          Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.all(16.0),
-              itemCount: messages.length,
-              itemBuilder: (context, index) {
-                final msg = messages[index];
-                return Align(
-                  alignment: msg.isUser ? Alignment.centerRight : Alignment.centerLeft,
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(vertical: 4),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: msg.isUser ? Colors.deepPurple[100] : Colors.grey[300],
-                      borderRadius: BorderRadius.circular(12),
+      body: SafeArea(
+        child: Column(
+          children: [
+            if (_initializing)
+              const LinearProgressIndicator(minHeight: 2),
+            Expanded(
+              child: controller.messages.isEmpty
+                  ? _EmptyState(strings: strings)
+                  : ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.all(16),
+                      itemCount: controller.messages.length,
+                      itemBuilder: (context, index) {
+                        final message = controller.messages[index];
+                        return _MessageBubble(
+                          message: message,
+                          isUser: message.isUser,
+                        );
+                      },
                     ),
-                    child: Text(
-                      msg.text,
-                      style: const TextStyle(fontSize: 16),
-                    ),
-                  ),
-                );
-              },
             ),
+            _StatusBanner(
+              strings: strings,
+              statusKey: controller.statusMessage,
+              isListening: controller.isListening,
+              sttAvailable: controller.sttAvailable,
+            ),
+            _InputBar(
+              controller: controller,
+              strings: strings,
+              textController: _textController,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LanguageMenu extends StatelessWidget {
+  const _LanguageMenu({
+    required this.language,
+    required this.onChanged,
+  });
+
+  final AppLanguage language;
+  final ValueChanged<AppLanguage> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonHideUnderline(
+      child: DropdownButton<AppLanguage>(
+        value: language,
+        onChanged: (value) {
+          if (value != null) {
+            onChanged(value);
+          }
+        },
+        items: [
+          for (final lang in AppLanguages.all)
+            DropdownMenuItem(
+              value: lang,
+              child: Text(AppLanguages.config(lang).displayName),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState({required this.strings});
+
+  final AppStrings strings;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Text(
+          strings.tapToSpeak,
+          style: Theme.of(context).textTheme.titleMedium,
+          textAlign: TextAlign.center,
+        ),
+      ),
+    );
+  }
+}
+
+class _InputBar extends StatelessWidget {
+  const _InputBar({
+    required this.controller,
+    required this.strings,
+    required this.textController,
+  });
+
+  final ChatController controller;
+  final AppStrings strings;
+  final TextEditingController textController;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      child: Row(
+        children: [
+          IconButton(
+            onPressed: controller.sttAvailable
+                ? () async {
+                    if (controller.isListening) {
+                      await controller.stopListening();
+                    } else {
+                      await controller.startListening();
+                    }
+                  }
+                : null,
+            icon: Icon(controller.isListening ? Icons.stop_circle : Icons.mic),
           ),
-          
-          // Thinking Indicator
-          if (_isThinking)
-            const Padding(
-              padding: EdgeInsets.only(left: 16, bottom: 8),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text("Thinking...", style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey)),
+          Expanded(
+            child: TextField(
+              controller: textController,
+              onChanged: (value) => controller.updateDraft(value),
+              minLines: 1,
+              maxLines: 3,
+              decoration: InputDecoration(
+                hintText: strings.typeMessage,
               ),
             ),
-
-          // Input Area
-          Container(
-            padding: const EdgeInsets.all(8.0),
-            color: Colors.white,
-            child: Row(
-              children: [
-                // Text Input
-                Expanded(
-                  child: TextField(
-                    controller: _textController,
-                    decoration: const InputDecoration(
-                      hintText: "Type or Speak...",
-                      border: OutlineInputBorder(),
-                    ),
-                    onSubmitted: _handleSubmitted,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                
-                // Mic Button
-                FloatingActionButton(
-                  onPressed: () {
-                    final stt = ref.read(sttServiceProvider);
-                    
-                    if (_isListening) {
-                      stt.stop();
-                      setState(() => _isListening = false);
-                    } else {
-                      setState(() => _isListening = true);
-                      final selectedLang = ref.read(languageProvider);
-                      stt.listen(onResult: (text) {
-                        setState(() {
-                          _textController.text = text;
-                        });
-                      }, language: selectedLang);
-                    }
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton(
+            onPressed: controller.isBusy
+                ? null
+                : () async {
+                    await controller.sendMessage(textController.text);
                   },
-                  backgroundColor: _isListening ? Colors.red : Colors.deepPurple,
-                  child: Icon(_isListening ? Icons.stop : Icons.mic),
-                ),
-                const SizedBox(width: 8),
-                
-                // Send Button
-                IconButton(
-                  icon: const Icon(Icons.send, color: Colors.deepPurple),
-                  onPressed: () => _handleSubmitted(_textController.text),
-                ),
-              ],
-            ),
+            child: Text(strings.send),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _MessageBubble extends StatelessWidget {
+  const _MessageBubble({
+    required this.message,
+    required this.isUser,
+  });
+
+  final Message message;
+  final bool isUser;
+
+  @override
+  Widget build(BuildContext context) {
+    final alignment = isUser ? Alignment.centerRight : Alignment.centerLeft;
+    final color = isUser
+        ? Theme.of(context).colorScheme.primaryContainer
+        : Theme.of(context).colorScheme.secondaryContainer;
+    final textColor = Theme.of(context).colorScheme.onSurface;
+
+    return Align(
+      alignment: alignment,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(12),
+        constraints: const BoxConstraints(maxWidth: 320),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          message.text,
+          style: TextStyle(color: textColor),
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusBanner extends StatelessWidget {
+  const _StatusBanner({
+    required this.strings,
+    required this.statusKey,
+    required this.isListening,
+    required this.sttAvailable,
+  });
+
+  final AppStrings strings;
+  final String? statusKey;
+  final bool isListening;
+  final bool sttAvailable;
+
+  @override
+  Widget build(BuildContext context) {
+    String? message;
+    if (!sttAvailable) {
+      message = strings.speechUnavailable;
+    } else if (isListening) {
+      message = strings.listening;
+    } else {
+      message = switch (statusKey) {
+        'stt_error' => strings.sttPermissionDenied,
+        'tts_unavailable' => strings.ttsUnavailable,
+        'retrying' => strings.retrying,
+        _ => null,
+      };
+    }
+    if (message == null) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Text(
+        message,
+        style: Theme.of(context).textTheme.bodySmall,
       ),
     );
   }

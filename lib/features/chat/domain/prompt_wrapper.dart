@@ -1,86 +1,151 @@
+import '../../../core/app_language.dart';
+import '../data/response_cache.dart';
+import 'intent.dart';
+import 'intent_model.dart';
+import 'local_model.dart';
+
+class WrappedResponse {
+  const WrappedResponse({
+    required this.response,
+    required this.intentResult,
+    required this.usedCache,
+    required this.attempts,
+  });
+
+  final ModelResponse response;
+  final IntentResult intentResult;
+  final bool usedCache;
+  final int attempts;
+}
+
 class PromptWrapper {
-  final Map<String, String> _responseCache = {};
+  PromptWrapper({
+    required IntentModel intentModel,
+    required LocalModel localModel,
+    required ResponseCache cache,
+  })  : _intentModel = intentModel,
+        _localModel = localModel,
+        _cache = cache,
+        _validator = OutputValidator();
 
-  String? getCachedResponse(String userText, String language) {
-    if (userText.trim().isEmpty) return null;
-    return _responseCache[_cacheKey(userText, language)];
-  }
+  final IntentModel _intentModel;
+  final LocalModel _localModel;
+  final ResponseCache _cache;
+  final OutputValidator _validator;
 
-  void cacheResponse(String userText, String language, String response) {
-    if (userText.trim().isNotEmpty && response.trim().isNotEmpty) {
-      _responseCache[_cacheKey(userText, language)] = response;
-    }
-  }
+  Future<WrappedResponse> handle(String text, AppLanguage language) async {
+    final normalized = _normalize(text);
+    final intentResult = _intentModel.predict(normalized);
+    final request = _buildRequest(intentResult.intent, language, text, strict: false);
+    final cacheKey = _cacheKey(language, intentResult.intent, normalized);
 
-  String processPrompt(String userText, String selectedLanguage) {
-    final cleanText = userText.trim();
-    if (cleanText.isEmpty) return "";
-
-    // 1. Detect Intent
-    final lower = cleanText.toLowerCase();
-    bool isTranslation = lower.startsWith("translate") || 
-                         lower.contains("translation") || 
-                         lower.startsWith("meaning of");
-
-    if (isTranslation) {
-      return _buildTranslationPrompt(cleanText, selectedLanguage);
-    } else {
-      return _buildChatPrompt(cleanText, selectedLanguage);
-    }
-  }
-
-  String _buildTranslationPrompt(String text, String language) {
-    // FIX: Removed invalid (?i) syntax. Using caseSensitive: false is safer.
-    final regex = RegExp(r'(translate|translation|meaning of|to)', caseSensitive: false);
-    String content = text.replaceAll(regex, '').trim();
-    
-    if (content.isEmpty) content = text;
-
-    final scriptHint = _scriptHint(language);
-    return """
-<|system|>
-You are a translator. Translate the text to $language. ${scriptHint}Output ONLY the translation. Do not add quotes, labels, or extra text.
-<|user|>
-Text: "$content"
-Target: $language
-<|assistant|>
-""";
-  }
-
-  String _buildChatPrompt(String text, String language) {
-    String langInstruction =
-        "Answer in English. Respond directly in one reply. Do not ask follow-up questions. Do not include role labels (User/You/Vani).";
-    
-    if (language != "English") {
-      final scriptHint = _scriptHint(language);
-      langInstruction =
-          "Answer in $language. ${scriptHint}Keep it short and respond directly. Do not include role labels (User/You/Vani).";
+    // Cache avoids repeated model work and ensures consistent responses.
+    final cached = _cache.get(cacheKey);
+    if (cached != null) {
+      return WrappedResponse(
+        response: ModelResponse(intent: intentResult.intent, text: cached),
+        intentResult: intentResult,
+        usedCache: true,
+        attempts: 1,
+      );
     }
 
-    return """
-<|system|>
-You are Vani. $langInstruction
-<|user|>
-$text
-<|assistant|>
-""";
+    var response = _localModel.generate(request);
+    var attempts = 1;
+    // Validate format/language; retry once with stricter constraints.
+    if (!_validator.isValid(response.text, language, request.maxWords)) {
+      final retryRequest = _buildRequest(
+        intentResult.intent,
+        language,
+        text,
+        strict: true,
+      );
+      response = _localModel.generate(retryRequest);
+      attempts = 2;
+    }
+
+    // Persist response for future identical requests.
+    await _cache.set(cacheKey, response.text);
+    return WrappedResponse(
+      response: response,
+      intentResult: intentResult,
+      usedCache: false,
+      attempts: attempts,
+    );
   }
 
-  String _cacheKey(String userText, String language) {
-    return '${language.toLowerCase().trim()}::${userText.trim().toLowerCase()}';
+  ModelRequest _buildRequest(
+    Intent intent,
+    AppLanguage language,
+    String text, {
+    required bool strict,
+  }) {
+    // Per-intent word caps keep outputs compact and predictable.
+    final maxWords = switch (intent) {
+      Intent.translate => 30,
+      Intent.summarize => 40,
+      Intent.qna => 35,
+      Intent.task => 45,
+      Intent.chat => 20,
+    };
+    return ModelRequest(
+      intent: intent,
+      language: language,
+      userText: text,
+      maxWords: maxWords,
+      strict: strict,
+    );
   }
 
-  String _scriptHint(String language) {
+  String _cacheKey(AppLanguage language, Intent intent, String normalizedText) {
+    return '${AppLanguages.config(language).code}::${intent.name}::$normalizedText';
+  }
+
+  String _normalize(String text) {
+    return text.trim().toLowerCase();
+  }
+}
+
+class OutputValidator {
+  bool isValid(String text, AppLanguage language, int maxWords) {
+    if (text.trim().isEmpty) {
+      return false;
+    }
+    final words = text.trim().split(RegExp(r'\s+'));
+    if (words.length > maxWords + 10) {
+      return false;
+    }
+    // Ensure output appears in the selected language script.
+    if (!_containsLanguageScript(text, language)) {
+      return false;
+    }
+    return true;
+  }
+
+  bool _containsLanguageScript(String text, AppLanguage language) {
+    if (language == AppLanguage.english) {
+      return true;
+    }
+    final runeList = text.runes.toList();
+    for (final rune in runeList) {
+      if (_matchesScript(rune, language)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool _matchesScript(int rune, AppLanguage language) {
     switch (language) {
-      case "Hindi":
-      case "Marathi":
-        return "Use Devanagari script. ";
-      case "Gujarati":
-        return "Use Gujarati script. ";
-      case "Tamil":
-        return "Use Tamil script. ";
-      default:
-        return "";
+      case AppLanguage.hindi:
+      case AppLanguage.marathi:
+        return rune >= 0x0900 && rune <= 0x097F;
+      case AppLanguage.tamil:
+        return rune >= 0x0B80 && rune <= 0x0BFF;
+      case AppLanguage.gujarati:
+        return rune >= 0x0A80 && rune <= 0x0AFF;
+      case AppLanguage.english:
+        return true;
     }
   }
 }

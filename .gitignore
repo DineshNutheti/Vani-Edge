@@ -44,6 +44,38 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+<<<<<<< HEAD
+
+/*.pdf
+
+# Local demo assets (keep app icons/assets in repo)
+/screenshots/
+/captures/
+/recordings/
+/demo/
+
+# Video/audio recordings
+*.mp4
+*.mov
+*.mkv
+*.avi
+*.webm
+*.mp3
+*.wav
+*.aac
+*.m4a
+
+# Archive artifacts
+*.zip
+*.tar.gz
+*.tgz
+*.7z
+*.rar
+
+# Build outputs
+*.apk
+*.aab
+=======
 # Assets (keep structure, ignore large binaries)
 assets/models/*.gguf
 assets/models/*.bin
@@ -60,3 +92,4 @@ flutter_*.png
 /android/app/src/main/jniLibs/*
 
 /*.pdf
+>>>>>>> e2f0ada3747d1b890e3d0aa6172a25ea5dfe9ffe
