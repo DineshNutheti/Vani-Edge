@@ -122,9 +122,3 @@ docs/limitations.md                      # Known limits
 - Response + TTS
 - Offline/local inference path
 - Repo structure + key modules
-
-## Timesheet
-Add your Google Sheet link in `docs/timesheet.md`.
-
-## Transcript / Recording
-Add transcript or recording link in `docs/limitations.md`.
