@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+/// Supported UI and speech languages in the app.
 enum AppLanguage {
   english,
   hindi,
@@ -8,6 +9,7 @@ enum AppLanguage {
   gujarati,
 }
 
+/// Immutable language configuration used by UI, STT, and TTS layers.
 class AppLanguageConfig {
   const AppLanguageConfig({
     required this.language,
@@ -26,7 +28,9 @@ class AppLanguageConfig {
   final String ttsLocaleId;
 }
 
+/// Helpers for language config lookup and normalization.
 class AppLanguages {
+  /// Ordered list used in the language dropdown.
   static const List<AppLanguage> all = [
     AppLanguage.english,
     AppLanguage.hindi,
@@ -79,8 +83,10 @@ class AppLanguages {
   };
 
   // Central lookup for STT/TTS locale IDs and display labels.
+  /// Single source of truth for locale + STT/TTS IDs used by UI and speech.
   static AppLanguageConfig config(AppLanguage language) => configs[language]!;
 
+  /// Maps a language code (en/hi/...) to AppLanguage.
   static AppLanguage fromCode(String code) {
     for (final config in configs.values) {
       if (config.code == code) {
@@ -90,11 +96,13 @@ class AppLanguages {
     return AppLanguage.english;
   }
 
+  /// Uses locale languageCode to map to AppLanguage.
   static AppLanguage fromLocale(Locale locale) {
     return fromCode(locale.languageCode);
   }
 }
 
+/// UI copy by language for visible strings.
 class AppStrings {
   const AppStrings(this.language);
 
@@ -204,6 +212,7 @@ class AppStrings {
   String get retrying => _value('retrying');
 }
 
+/// Response templates and prefixes by language.
 class ResponseStrings {
   const ResponseStrings(this.language);
 

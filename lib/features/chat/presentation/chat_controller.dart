@@ -14,6 +14,7 @@ import '../domain/message.dart';
 import '../domain/prompt_wrapper.dart';
 import '../data/knowledge_base.dart';
 
+/// Coordinates UI, speech, wrapper, model, and persistence layers.
 class ChatController extends ChangeNotifier {
   ChatController({
     required AppSettings settings,
@@ -47,7 +48,7 @@ class ChatController extends ChangeNotifier {
   final KnowledgeBase _knowledgeBase;
   late final PromptWrapper _promptWrapper;
 
-  // In-memory message list mirrors persisted history.
+  // Source-of-truth for chat UI; persisted to shared prefs after each exchange.
   final List<Message> _messages;
   bool _isListening = false;
   bool _isBusy = false;
@@ -64,7 +65,7 @@ class ChatController extends ChangeNotifier {
   AppLanguage get language => _settings.language;
 
   Future<void> init() async {
-    // Load assets, cache, and speech engines before UI interaction.
+    // Load model assets, cache, speech engines, and history before UI interaction.
     await Future.wait([
       _intentModel.loadFromAssets('assets/intent_samples.json'),
       _knowledgeBase.loadFromAssets('assets/knowledge_base.json'),
@@ -130,6 +131,7 @@ class ChatController extends ChangeNotifier {
     await sendMessage(_draftText);
   }
 
+  /// Orchestrates: user message -> wrapper -> model response -> TTS -> persist.
   Future<void> sendMessage(String text) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty || _isBusy) {
@@ -151,7 +153,7 @@ class ChatController extends ChangeNotifier {
 
     try {
       final wrapped = await _promptWrapper.handle(trimmed, language);
-      // Assistant response follows wrapper constraints and caching.
+      // Assistant response is already validated/cached by the wrapper.
       _addMessage(Message(
         id: _newId(),
         text: wrapped.response.text,

@@ -4,6 +4,7 @@ import '../../../core/app_language.dart';
 import '../domain/message.dart';
 import 'chat_controller.dart';
 
+/// Main conversation UI with language selector and input controls.
 class ChatScreen extends StatefulWidget {
   const ChatScreen({
     super.key,
@@ -57,7 +58,7 @@ class _ChatScreenState extends State<ChatScreen> {
       );
       _isInternalUpdate = false;
     }
-    // Keep latest messages visible after new responses.
+    // Auto-scroll after updates so latest messages are visible without manual scrolling.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(

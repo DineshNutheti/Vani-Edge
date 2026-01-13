@@ -38,6 +38,23 @@
 - `lib/features/chat/presentation/chat_controller.dart`: orchestration of STT, wrapper, model, TTS, history.
 - `lib/features/chat/presentation/chat_screen.dart`: UI, message list, input bar, status banner.
 
+## 8.2.1 Project Layout (Top-Level)
+```
+.
+├── assets/          # intent samples + knowledge base
+├── docs/            # architecture, wrapper spec, performance, limitations
+├── lib/             # Dart source (core + features)
+├── android/         # Android host project
+├── ios/             # iOS host project
+├── linux/           # Linux desktop host project
+├── macos/           # macOS host project
+├── web/             # Web host project
+├── windows/         # Windows host project
+├── pubspec.yaml
+├── pubspec.lock
+└── README.md
+```
+
 ## 8.3 Data Flow
 Mic input -> STT -> prompt wrapper -> local model -> wrapper -> UI -> TTS
 

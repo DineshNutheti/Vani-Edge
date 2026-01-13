@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import 'app_language.dart';
 
+/// App-level settings that drive UI (currently selected language).
 class AppSettings extends ChangeNotifier {
   AppSettings({AppLanguage? language})
       : _language = language ?? AppLanguage.english;
@@ -10,6 +11,7 @@ class AppSettings extends ChangeNotifier {
 
   AppLanguage get language => _language;
 
+  /// Updates language and notifies listeners for rebuilds.
   void setLanguage(AppLanguage language) {
     if (_language == language) {
       return;

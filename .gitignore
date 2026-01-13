@@ -44,10 +44,6 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-<<<<<<< HEAD
-
-/*.pdf
-
 # Local demo assets (keep app icons/assets in repo)
 /screenshots/
 /captures/
@@ -75,7 +71,7 @@ app.*.map.json
 # Build outputs
 *.apk
 *.aab
-=======
+
 # Assets (keep structure, ignore large binaries)
 assets/models/*.gguf
 assets/models/*.bin
@@ -92,4 +88,3 @@ flutter_*.png
 /android/app/src/main/jniLibs/*
 
 /*.pdf
->>>>>>> e2f0ada3747d1b890e3d0aa6172a25ea5dfe9ffe

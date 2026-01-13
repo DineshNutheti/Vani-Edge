@@ -17,6 +17,7 @@ void main() {
   runApp(const VaniEdgeApp());
 }
 
+/// Root widget that wires app settings and the chat controller.
 class VaniEdgeApp extends StatefulWidget {
   const VaniEdgeApp({super.key});
 
@@ -31,7 +32,7 @@ class _VaniEdgeAppState extends State<VaniEdgeApp> {
   @override
   void initState() {
     super.initState();
-    // Start with system locale when possible; fall back to English.
+    // Use system locale when available so the first render matches device language.
     final systemLocale = WidgetsBinding.instance.platformDispatcher.locale;
     _settings = AppSettings(language: AppLanguages.fromLocale(systemLocale));
     _chatController = ChatController(

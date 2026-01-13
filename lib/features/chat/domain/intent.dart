@@ -1,3 +1,4 @@
+/// Supported request intents used by the local model.
 enum Intent {
   translate,
   summarize,
@@ -6,6 +7,7 @@ enum Intent {
   chat,
 }
 
+/// Classification output including confidence and per-intent scores.
 class IntentResult {
   const IntentResult({
     required this.intent,
