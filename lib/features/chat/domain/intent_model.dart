@@ -5,23 +5,26 @@ import 'package:flutter/services.dart';
 
 import 'intent.dart';
 
+/// Naive Bayes text classifier trained from local intent samples.
 class IntentModel {
-  // Bag-of-words counts per intent for a naive Bayes classifier.
+  // Bag-of-words counts per intent (token -> count) for Naive Bayes.
   final Map<Intent, Map<String, int>> _wordCounts = {
     for (final intent in Intent.values) intent: {},
   };
-  // Total token counts per intent for normalization.
+  // Total token counts per intent for P(token|intent).
   final Map<Intent, int> _totalWords = {
     for (final intent in Intent.values) intent: 0,
   };
-  // Number of samples per intent to compute priors.
+  // Sample counts per intent for P(intent).
   final Map<Intent, int> _docCounts = {
     for (final intent in Intent.values) intent: 0,
   };
-  // Vocabulary for Laplace smoothing.
+  // Vocabulary size for Laplace smoothing across intents.
   final Set<String> _vocab = {};
   bool _trained = false;
 
+  /// Trains the intent model from a JSON asset of {intent, text} samples.
+  /// Input: asset path; Output: internal word/intent counts used by predict().
   Future<void> loadFromAssets(String path) async {
     if (_trained) {
       return;
@@ -33,7 +36,7 @@ class IntentModel {
       final intent = _intentFromString(map['intent'] as String);
       final text = (map['text'] as String).trim();
       _docCounts[intent] = (_docCounts[intent] ?? 0) + 1;
-      // Tokenize and update counts for naive Bayes.
+      // Tokenize and update counts for Naive Bayes training.
       for (final token in _tokenize(text)) {
         _vocab.add(token);
         final counts = _wordCounts[intent]!;
@@ -44,6 +47,7 @@ class IntentModel {
     _trained = true;
   }
 
+  /// Returns the most likely intent and confidence for the given text.
   IntentResult predict(String text) {
     if (!_trained) {
       return const IntentResult(
@@ -82,7 +86,7 @@ class IntentModel {
     final maxLog = logScores.values.reduce(max);
     double sumExp = 0;
     final Map<Intent, double> scores = {};
-    // Convert log scores to normalized probabilities.
+    // Convert log scores to normalized probabilities (softmax).
     for (final entry in logScores.entries) {
       final score = exp(entry.value - maxLog);
       scores[entry.key] = score;
@@ -119,6 +123,7 @@ class IntentModel {
     }
   }
 
+  // Unicode-aware cleanup keeps tokens consistent across languages.
   List<String> _tokenize(String text) {
     // Unicode-aware cleanup keeps tokens consistent across languages.
     final normalized = text.toLowerCase().replaceAll(RegExp(r'[\p{P}\p{S}]', unicode: true), ' ');

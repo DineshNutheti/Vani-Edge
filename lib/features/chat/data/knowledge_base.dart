@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 
 import '../../../core/app_language.dart';
 
+/// Single KB entry with keywords and localized answers.
 class KnowledgeEntry {
   KnowledgeEntry({
     required this.id,
@@ -20,15 +21,17 @@ class KnowledgeEntry {
   }
 }
 
+/// Loads and searches KB entries by token overlap.
 class KnowledgeBase {
   final List<KnowledgeEntry> _entries = [];
   bool _loaded = false;
 
+  /// Loads KB entries from a JSON asset once per app session.
   Future<void> loadFromAssets(String path) async {
     if (_loaded) {
       return;
     }
-    // Load static knowledge entries from JSON asset once.
+    // Load static KB entries once to avoid repeated asset I/O.
     final raw = await rootBundle.loadString(path);
     final data = jsonDecode(raw) as List<dynamic>;
     for (final entry in data) {
@@ -56,6 +59,7 @@ class KnowledgeBase {
     _loaded = true;
   }
 
+  /// Returns the best matching answer for text in the given language, or null.
   String? lookup(String text, AppLanguage language) {
     if (_entries.isEmpty) {
       return null;
@@ -67,7 +71,7 @@ class KnowledgeBase {
     KnowledgeEntry? bestEntry;
     int bestScore = 0;
     for (final entry in _entries) {
-      // Simple token overlap scoring per language.
+      // Token overlap scoring selects the best matching answer per language.
       final keywords = entry.keywords[language] ?? entry.keywords[AppLanguage.english] ?? [];
       final score = tokens.where((token) => keywords.contains(token)).length;
       if (score > bestScore) {

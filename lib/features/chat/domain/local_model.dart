@@ -2,6 +2,7 @@ import '../../../core/app_language.dart';
 import '../data/knowledge_base.dart';
 import 'intent.dart';
 
+/// Input to the local model with constraints set by the wrapper.
 class ModelRequest {
   ModelRequest({
     required this.intent,
@@ -18,6 +19,7 @@ class ModelRequest {
   final bool strict;
 }
 
+/// Output from the local model.
 class ModelResponse {
   const ModelResponse({required this.intent, required this.text});
 
@@ -25,12 +27,15 @@ class ModelResponse {
   final String text;
 }
 
+/// Deterministic response generator (templates + KB) for Option B.
 class LocalModel {
   LocalModel({required KnowledgeBase knowledgeBase}) : _knowledgeBase = knowledgeBase;
 
-  // Keyword-based knowledge base used for deterministic QnA.
+  // Keyword-based knowledge base used for deterministic QnA responses.
   final KnowledgeBase _knowledgeBase;
 
+  /// Routes by intent and returns a deterministic response text.
+  /// Input: ModelRequest; Output: ModelResponse with selected template.
   ModelResponse generate(ModelRequest request) {
     final responses = ResponseStrings(request.language);
     switch (request.intent) {
@@ -63,7 +68,7 @@ class LocalModel {
   }
 
   String _translate(ModelRequest request, ResponseStrings responses) {
-    // Glossary lookup is fast and stable; no generative translation.
+    // Glossary lookup is fast and deterministic; no generative translation.
     if (request.strict) {
       return responses.translationFallback;
     }
@@ -76,7 +81,7 @@ class LocalModel {
   }
 
   String _summarize(ModelRequest request, ResponseStrings responses) {
-    // Simple extractive summary: first two sentences when input is long enough.
+    // Extractive summary: take first two sentences if input is long enough.
     final text = request.userText.trim();
     if (text.split(RegExp(r'\s+')).length < 8) {
       return responses.summaryFallback;
@@ -97,7 +102,7 @@ class LocalModel {
   }
 
   String _task(ModelRequest request, ResponseStrings responses) {
-    // Structured steps keep responses short and deterministic.
+    // Structured steps keep responses short and consistent across platforms.
     if (request.strict) {
       return responses.taskFallback;
     }
@@ -203,7 +208,7 @@ class LocalModel {
     if (options.isEmpty) {
       return seedText;
     }
-    // Stable selection ensures same input gets the same response.
+    // Stable selection ensures same input yields the same response.
     final hash = seedText.codeUnits.fold<int>(0, (sum, value) => sum + value);
     final index = hash % options.length;
     return options[index];

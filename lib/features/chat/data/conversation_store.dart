@@ -4,13 +4,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/message.dart';
 
+/// Persists conversation history in shared preferences.
 class ConversationStore {
   ConversationStore({this.storageKey = 'conversation_history'});
 
   final String storageKey;
 
+  /// Loads conversation history from shared preferences.
   Future<List<Message>> load() async {
-    // History is stored as a JSON array in shared preferences.
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(storageKey);
     if (raw == null || raw.isEmpty) {
@@ -22,8 +23,8 @@ class ConversationStore {
         .toList();
   }
 
+  /// Persists full history in a single JSON array.
   Future<void> save(List<Message> messages) async {
-    // Persist the full list to keep ordering stable across launches.
     final prefs = await SharedPreferences.getInstance();
     final data = messages.map((message) => message.toJson()).toList();
     await prefs.setString(storageKey, jsonEncode(data));

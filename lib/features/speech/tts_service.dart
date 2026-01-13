@@ -2,11 +2,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
+/// Thin wrapper over flutter_tts with platform availability checks.
 class TtsService {
   final FlutterTts _tts = FlutterTts();
   bool _initialized = false;
   bool _available = false;
 
+  /// Initializes the TTS engine; marks unavailable when plugin missing.
   Future<void> init() async {
     if (_initialized) {
       return;
@@ -26,6 +28,7 @@ class TtsService {
     _initialized = true;
   }
 
+  /// Speaks text in the given locale. Returns false if not supported.
   Future<bool> speak({required String text, required String localeId}) async {
     if (!_available) {
       return false;
@@ -39,6 +42,7 @@ class TtsService {
     }
   }
 
+  /// Stops any in-progress TTS playback.
   Future<void> stop() async {
     if (_available) {
       await _tts.stop();

@@ -4,6 +4,7 @@ import 'intent.dart';
 import 'intent_model.dart';
 import 'local_model.dart';
 
+/// Wrapper output with response metadata for debugging and UI.
 class WrappedResponse {
   const WrappedResponse({
     required this.response,
@@ -18,6 +19,7 @@ class WrappedResponse {
   final int attempts;
 }
 
+/// Orchestrates intent detection, constraints, caching, and validation.
 class PromptWrapper {
   PromptWrapper({
     required IntentModel intentModel,
@@ -33,13 +35,15 @@ class PromptWrapper {
   final ResponseCache _cache;
   final OutputValidator _validator;
 
+  /// End-to-end wrapper: detect intent, enforce constraints, retry, and cache.
+  /// Input: raw user text + language; Output: response + metadata.
   Future<WrappedResponse> handle(String text, AppLanguage language) async {
     final normalized = _normalize(text);
     final intentResult = _intentModel.predict(normalized);
     final request = _buildRequest(intentResult.intent, language, text, strict: false);
     final cacheKey = _cacheKey(language, intentResult.intent, normalized);
 
-    // Cache avoids repeated model work and ensures consistent responses.
+    // Cache avoids repeated model work and keeps identical inputs consistent.
     final cached = _cache.get(cacheKey);
     if (cached != null) {
       return WrappedResponse(
@@ -106,6 +110,7 @@ class PromptWrapper {
   }
 }
 
+/// Validates response text length and language script.
 class OutputValidator {
   bool isValid(String text, AppLanguage language, int maxWords) {
     if (text.trim().isEmpty) {

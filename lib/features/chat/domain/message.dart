@@ -1,5 +1,6 @@
 import '../../../core/app_language.dart';
 
+/// Conversation message stored in history and shown in UI.
 class Message {
   Message({
     required this.id,
@@ -15,6 +16,7 @@ class Message {
   final DateTime timestamp;
   final AppLanguage language;
 
+  /// Serializes for persistence in shared preferences.
   Map<String, dynamic> toJson() => {
         'id': id,
         'text': text,
@@ -23,6 +25,7 @@ class Message {
         'language': AppLanguages.config(language).code,
       };
 
+  /// Hydrates from persisted JSON.
   factory Message.fromJson(Map<String, dynamic> json) {
     return Message(
       id: json['id'] as String,

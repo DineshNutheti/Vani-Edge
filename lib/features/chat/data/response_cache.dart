@@ -2,14 +2,15 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// In-memory + persisted cache keyed by language/intent/text.
 class ResponseCache {
   ResponseCache({this.storageKey = 'response_cache'});
 
   final String storageKey;
   final Map<String, String> _memory = {};
 
+  /// Loads cached responses into memory for fast lookup.
   Future<void> load() async {
-    // Load cached responses from shared preferences for consistency.
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(storageKey);
     if (raw == null || raw.isEmpty) {
@@ -23,6 +24,7 @@ class ResponseCache {
 
   String? get(String key) => _memory[key];
 
+  /// Stores a response by cache key and persists the map.
   Future<void> set(String key, String value) async {
     _memory[key] = value;
     await _persist();
@@ -34,7 +36,7 @@ class ResponseCache {
   }
 
   Future<void> _persist() async {
-    // Persist full cache map; small size keeps it lightweight.
+    // Persist full cache map; size is small because entries are short texts.
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(storageKey, jsonEncode(_memory));
   }

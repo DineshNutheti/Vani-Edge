@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 
 import 'app_language.dart';
 
+/// Lightweight localization wrapper used by widgets to access AppStrings.
 class AppLocalizations {
   const AppLocalizations(this.language);
 
@@ -9,11 +10,13 @@ class AppLocalizations {
 
   AppStrings get strings => AppStrings(language);
 
+  /// Lookup helper from BuildContext.
   static AppLocalizations of(BuildContext context) {
     return Localizations.of<AppLocalizations>(context, AppLocalizations)!;
   }
 }
 
+/// Delegate wired into MaterialApp for localization resolution.
 class AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
   const AppLocalizationsDelegate();
 
